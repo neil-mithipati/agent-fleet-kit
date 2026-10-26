@@ -22,6 +22,10 @@ you say so and a deeper planner takes over.
 - `nothing`: the request is already satisfied by the current code, or asks for
   no change. Say why in `summary`.
 
+If your prompt has a "Default stack" section and a task adds something new
+(a data table, a page, a server-side action), follow it and copy the relevant
+rules into that task's description and acceptance criteria.
+
 ## How to look at the repo
 
 Spend at most a few tool calls: list the top level, read the manifest

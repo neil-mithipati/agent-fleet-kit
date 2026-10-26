@@ -106,4 +106,7 @@ Watch it live at http://127.0.0.1:4777. Read what shipped in `CHANGELOG.md`.
 | `fleet retry <id> "answer"` | Unblock a task, then `fleet do` |
 | `fleet stop` | Pause; in-flight work resumes later |
 
-Tune models, limits, parallelism and auto-push in `.fleet/config.json`.
+New apps default to **TypeScript, React + Vite, Supabase (+ Auth), Tailwind,
+Vitest and ESLint, deployed on Vercel**, unless your request names another
+stack. Change the default, models, limits, parallelism and auto-push in
+`.fleet/config.json`.

@@ -136,7 +136,11 @@ are printed at plan time and written into the changelog so the human can
 correct them later. A plan with `questions` dispatches nothing.
 
 An empty repository always goes to the deep planner and starts with a scaffold
-task.
+task. Unless the request names a stack, planners use `stack` from
+`.fleet/config.json` (TypeScript, React + Vite, Supabase, Tailwind, Vitest,
+Vercel by default) and copy its rules (RLS on every table, secrets only in
+Edge Functions, gate scripts in package.json) into the tasks they apply to.
+An existing repo's own stack always wins.
 
 ## State
 

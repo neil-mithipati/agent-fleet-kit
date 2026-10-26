@@ -91,6 +91,18 @@ test('escalation policy: last_resort vs eager', () => {
   assert.strictEqual(shouldEscalate(E, t(1, { gate_failures: 2 }), 'gates_test'), true);
 });
 
+const { buildPrompt } = require('../lib/planner');
+const { DEFAULTS } = require('../lib/config');
+test('planner prompt carries the default stack and its rules', () => {
+  const ctx = (stack) => ({ cfg: { ...DEFAULTS, stack }, state: { tasks: () => [] }, root: os.tmpdir(), base: 'main', gates: {} });
+  const snap = { top: [], manifests: [], empty: true };
+  const p = buildPrompt(ctx(DEFAULTS.stack), 'build a habit tracker', snap, null);
+  assert.match(p, /# Default stack/);
+  assert.match(p, /React \+ Vite/);
+  assert.match(p, /Row Level Security/);
+  assert.doesNotMatch(buildPrompt(ctx(null), 'x', snap, null), /Default stack/);
+});
+
 (async () => {
   let failed = 0;
   for (const [name, fn] of tests) {

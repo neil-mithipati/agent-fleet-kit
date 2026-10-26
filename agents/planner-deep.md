@@ -19,9 +19,12 @@ questions, so the quality of your task descriptions decides the outcome.
 
 ## Stack choice for a new app
 
-If the request names a stack, use it. Otherwise choose the most conventional,
-boring option for the kind of app requested, with a test runner, a type
-checker or linter, and a single command to run locally. State it in `stack`.
+If the request names a stack, use it. Otherwise, if your prompt has a
+"Default stack" section, use that stack and carry its rules into the tasks
+they apply to (the scaffold task usually takes most of them). Otherwise choose
+the most conventional, boring option for the kind of app requested, with a
+test runner, a type checker or linter, and a single command to run locally.
+State the stack in `stack`.
 The first task of a new app is always a scaffold task that leaves the repo
 with a runnable app, passing tests (at least one), and a README with the run
 command. Later tasks build on it.
