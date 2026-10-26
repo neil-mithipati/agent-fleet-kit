@@ -1,4 +1,4 @@
-# agent-fleet
+# agent-fleet-kit
 
 A fleet of Claude agents that builds an app with minimal human oversight.
 Describe what you want; the fleet plans it, builds it in parallel worktrees,
@@ -23,8 +23,8 @@ in `CHANGELOG.md`.
 Requirements: Node 18+, git, and the Claude Code CLI (`claude`) signed in.
 
 ```bash
-git clone <this repo> ~/agent-fleet
-cd ~/agent-fleet && npm link          # puts `fleet` on your PATH; or symlink bin/fleet yourself
+git clone https://github.com/neil-mithipati/agent-fleet-kit.git ~/agent-fleet-kit
+cd ~/agent-fleet-kit && npm link          # puts `fleet` on your PATH; or symlink bin/fleet yourself
 fleet help
 ```
 

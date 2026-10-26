@@ -1,5 +1,5 @@
 {
-  "name": "agent-fleet",
+  "name": "agent-fleet-kit",
   "version": "1.0.0",
   "description": "A fleet of Claude agents that builds an app with minimal human oversight: plan, build in parallel worktrees, gate, review, merge, changelog.",
   "bin": { "fleet": "bin/fleet" },
