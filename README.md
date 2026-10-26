@@ -1,22 +1,18 @@
 # agent-fleet-kit (AFK)
 
-Describe a feature in one sentence. A fleet of Claude agents plans it, builds
-it in parallel, tests it, reviews it, merges it and writes the changelog,
-while you're away from the keyboard.
+One sentence in; a tested, merged and deployed feature out. AFK plans the work,
+builds it with parallel Claude agents, tests and reviews it, then merges,
+deploys and writes the changelog while you're away from the keyboard.
 
-- **Trust comes from the runner, not the agent.** Plain code runs the loop and
-  the tests, so "done" means the gates actually passed.
-- **The right model for each task.** Haiku for small fixes, Sonnet for
-  features, Opus only for large or stuck work.
-- **Bounded by design.** Every retry, dollar and minute has a cap. No endless
-  loops; anything stuck comes back to you with the reason.
+- **Code runs the loop, not a model.** The runner runs the tests itself, so "done" means green.
+- **Cheapest model that works.** Haiku, Sonnet or Opus by task size; retries stay on the same model.
+- **Bounded.** Attempts, dollars and minutes are capped; stuck work comes back to you with the reason.
 
 ## How it works
 
-Solid: main path. Dashed: escalation, or a question for you.
-**Retries:** red gates or blocking review findings send the task back to the
-same builder (≤3 attempts). A stronger tier joins only on the last attempt;
-lint and typecheck fixes go to haiku.
+Dashed: escalation or a question for you. Red gates or blocking findings send
+the task back to the same builder (≤3 attempts); a stronger model joins only
+on the last one.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 420, "nodeSpacing": 40, "rankSpacing": 55, "curve": "linear"}}}%%
@@ -37,6 +33,8 @@ flowchart TD
   reviewerDeep("<b>reviewer-deep</b><br/>opus · high · 50 turns<br/>correctness + adversarial")
 
   merge("<b>merge + push</b><br/>one at a time · synced with main")
+  vercel("<b>Vercel</b><br/>deploys every push")
+  supabase("<b>Supabase</b><br/>new migrations applied")
   publisher("<b>publisher</b><br/>sonnet · med · 20 turns<br/>merged work → release notes")
   changelog("<b>CHANGELOG.md</b><br/>what shipped · what needs you")
 
@@ -49,7 +47,8 @@ flowchart TD
   light & builder & deep --> gates
   gates --> noreview & reviewer & reviewerDeep
   noreview & reviewer & reviewerDeep --> merge
-  merge --> publisher --> changelog
+  merge --> vercel & publisher & supabase
+  publisher --> changelog
 
   classDef human fill:#f0eee8,stroke:#8a8a85,color:#3a3a38
   classDef core fill:#eeeefc,stroke:#5b55c4,color:#3f3a9a
@@ -59,7 +58,7 @@ flowchart TD
   classDef review fill:#f8ebe6,stroke:#b5553a,color:#7a2e18
   classDef ship fill:#e9f2df,stroke:#5d8a32,color:#2d5212
   classDef pub fill:#fbe8ef,stroke:#b23a68,color:#7a1f43
-  class human,changelog human
+  class human,changelog,vercel,supabase human
   class runner,planner,plannerDeep core
   class light,builder,deep build
   class gates gate
@@ -70,41 +69,56 @@ flowchart TD
   linkStyle default stroke:#8a8a85,stroke-width:1.5px
 ```
 
-Every agent is a single `claude -p` call that returns JSON; the runner decides
-what happens next. Agents never push, rewrite history or read secrets.
-Details: [ARCHITECTURE.md](ARCHITECTURE.md).
+## Install
 
-## Install and use
-
-Requires Node 18+, git and the [Claude Code](https://claude.com/claude-code) CLI, signed in.
+Needs Node 18+, git and [Claude Code](https://claude.com/claude-code), signed in.
 
 ```bash
 git clone https://github.com/neil-mithipati/agent-fleet-kit.git ~/agent-fleet-kit
-cd ~/agent-fleet-kit && npm link        # puts `fleet` on your PATH, no dependencies
+cd ~/agent-fleet-kit && npm link
 ```
+
+**Database + deploys (optional, once per machine).** `fleet connect` uses your
+own Supabase and Vercel logins:
+
+```bash
+brew install supabase/tap/supabase && supabase login
+npm i -g vercel && vercel login
+```
+
+Then run `fleet connect` once per app. It:
+
+- creates and links a Supabase project (`--region`, default `us-east-1`; `--org <id>` if you have several orgs)
+- links a Vercel project to the app's GitHub repo, so every push deploys
+- writes the Supabase URL, public key and database password to `.env.local` (gitignored, never readable by agents) and sets the public ones on Vercel
+
+From then on, merged migrations are applied to Supabase automatically
+(`"db_push": "manual"` in `.fleet/config.json` turns that off).
+
+## Use
 
 **New app**
 
 ```bash
-fleet init ~/code/habit-tracker && cd ~/code/habit-tracker
-fleet do "Build a habit tracker: add habits, check them off daily, show streaks"
+fleet init ~/code/habits && cd ~/code/habits
+git remote add origin <empty GitHub repo url>   # auto-push + deploys
+fleet connect                                   # creates Supabase + Vercel projects, writes .env.local
+fleet do "Build a habit tracker: daily check-offs and streaks"
 ```
 
-**Existing repo** (adds `.fleet/` and `CHANGELOG.md`, touches nothing else)
+**Existing repo:** `cd my-app && fleet init && fleet do "..."` (adds `.fleet/` and `CHANGELOG.md` only).
 
-```bash
-cd ~/code/my-app && fleet init
-fleet do "Streaks should survive a missed weekend day"
-```
+New apps default to TypeScript, React + Vite, Supabase (+ Auth), Tailwind,
+Vitest and ESLint on Vercel, unless your request names a stack.
 
-Watch it live at http://127.0.0.1:4777. Read what shipped in `CHANGELOG.md`.
-
-| command | what it does |
+| command | |
 |---|---|
-| `fleet do "<request>"` | Plan, build, test, review, merge, push |
-| `fleet do` | Resume after a stop, crash or retry |
-| `fleet status [id]` | What's running, what shipped, what needs you |
-| `fleet retry <id> "answer"` | Unblock a task, then `fleet do` |
-| `fleet stop` | Pause; in-flight work resumes later |
+| `fleet do "<request>"` | plan, build, test, review, merge, deploy |
+| `fleet do` | resume after a stop, crash or retry |
+| `fleet status [id]` | what's running, shipped, or needs you |
+| `fleet retry <id> "answer"` | unblock a task, then `fleet do` |
+| `fleet connect` | link Supabase + Vercel (once per app) |
+| `fleet stop` | pause; work resumes later |
 
-Tune models, limits, parallelism and auto-push in `.fleet/config.json`.
+Live view: http://127.0.0.1:4777. Settings: `.fleet/config.json`.
+Design: [ARCHITECTURE.md](ARCHITECTURE.md).
