@@ -31,4 +31,15 @@ if [ "$SCEN" = "blocked" ]; then
   "$FLEET" do
   "$FLEET" status --all
 fi
+if [ "$SCEN" = "reviewstuck" ]; then
+  echo "== assert: out of review rounds stops without another build"
+  node -e "
+const fs=require('fs'),path=require('path');const d='.fleet/state';
+const t=fs.readdirSync(d+'/tasks').map(f=>JSON.parse(fs.readFileSync(d+'/tasks/'+f))).find(t=>/README/.test(t.title));
+const runs=[];(function walk(p){for(const f of fs.readdirSync(p)){const q=path.join(p,f);fs.statSync(q).isDirectory()?walk(q):runs.push(f);}})(d+'/runs');
+const builds=runs.filter(f=>f.startsWith(t.id+'-')&&/-builder[^/]*\\.log$/.test(f));
+console.log(t.id,t.state,'builds:',builds.join(' '));
+if(t.state!=='needs_human'){console.error('expected needs_human');process.exit(1);}
+if(builds.length!==2){console.error('expected exactly 2 builds, got '+builds.length);process.exit(1);}"
+fi
 echo "== OK ($APP)"

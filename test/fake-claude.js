@@ -88,6 +88,7 @@ if (role.startsWith('reviewer')) {
   const criteria = [...prompt.matchAll(/^\d+\. (.*)$/gm)].map(m => m[1]);
   let fail = false;
   if (scenario === 'reviewfail' && /README/.test(title) && !/```js/.test(prompt)) fail = true;
+  if (scenario === 'reviewstuck' && /README/.test(title)) fail = true; // never satisfied
   if (scenario === 'escalate' && role === 'reviewer' && /README/.test(title)) finish({ verdict: 'escalate', criteria: criteria.map(c => ({ text: c, pass: true })), findings: [], scope_ok: true, summary: 'touches auth-ish things', escalate_reason: 'session handling', gates_run: 'npm test' }, 0.1);
   finish({
     verdict: fail ? 'fail' : 'pass',

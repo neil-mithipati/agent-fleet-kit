@@ -68,7 +68,7 @@ Every loop is in `lib/scheduler.js`, and every loop has a counter:
 | review rounds per task | `retries.max_review_rounds` (2) | `needs_human` |
 | gate failures before escalating a tier | 2 | escalate |
 | agent turns | per-role `limits.max_turns` | the call fails, counts as an attempt |
-| agent wall clock | per-role `limits.timeout_min` | killed, counts as an attempt |
+| agent wall clock | per-role `limits.timeout_min` | killed, counts as an attempt, charged its `budget_usd` cap |
 | agent dollars | per-role `limits.budget_usd` | the call fails, counts as an attempt |
 | mission wall clock | `mission.timeout_min` | remaining tasks → `needs_human` |
 | mission dollars | `mission.budget_usd` | remaining tasks → `needs_human` |
@@ -184,6 +184,9 @@ two seconds. It is started detached by `fleet do` when
 
 `test/fake-claude.js` imitates `claude -p` (same flags, same stream-json) and
 plays scripted roles; `test/e2e.sh <scenario>` runs the whole pipeline against
-it: `gatefail`, `reviewfail`, `escalate`, `blocked` (then `fleet retry` and
-resume), `default` (fast planner), `questions`. Point `claude_bin` in
+it: `gatefail`, `reviewfail`, `reviewstuck` (asserts no build after the last
+review round), `escalate`, `blocked` (then `fleet retry` and resume), `default`
+(fast planner), `questions`. `test/unit.js` covers what the scenarios can't
+observe: gates not blocking the event loop, timeout process-tree kills, and
+cost accounting for calls that never report a cost. `npm test` runs all of it. Point `claude_bin` in
 `.fleet/config.json` at the fake to reproduce.
