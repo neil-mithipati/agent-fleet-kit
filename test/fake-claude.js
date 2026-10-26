@@ -73,6 +73,7 @@ if (role.startsWith('builder')) {
     write('test/add.test.js', `const test = require('node:test');\nconst assert = require('node:assert');\nconst { add } = require('../src/add.js');\ntest('add', () => assert.strictEqual(add(1, 2), ${broken ? 4 : 3}));\n`);
   } else if (/hello\.txt/.test(title)) {
     write('hello.txt', 'hello fleet\n');
+    if (scenario === 'dbpush') write('supabase/migrations/20260101000000_habits.sql', 'create table habits (id bigint primary key);\nalter table habits enable row level security;\n');
   } else if (/sub to add/.test(title)) {
     write('src/add.js', "'use strict';\nmodule.exports = { add: (a, b) => a + b, sub: (a, b) => a - b };\n");
     const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')); pkg.version = '0.2.0';

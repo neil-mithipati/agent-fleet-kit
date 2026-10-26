@@ -103,6 +103,28 @@ test('planner prompt carries the default stack and its rules', () => {
   assert.doesNotMatch(buildPrompt(ctx(null), 'x', snap, null), /Default stack/);
 });
 
+const connectMod = require('../lib/connect');
+test('connect picks the publishable key, never service_role', () => {
+  assert.strictEqual(connectMod.pickPublicKey([{ name: 'anon', api_key: 'a' }, { name: 'service_role', api_key: 's' }, { name: 'default', type: 'publishable', api_key: 'sb_publishable_p' }]), 'sb_publishable_p');
+  assert.strictEqual(connectMod.pickPublicKey([{ name: 'service_role', api_key: 's' }, { name: 'anon', api_key: 'a' }]), 'a');
+  assert.strictEqual(connectMod.pickPublicKey([{ name: 'service_role', api_key: 's' }]), null);
+});
+test('.env.local merge keeps other lines and updates keys in place', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-env-'));
+  fs.writeFileSync(path.join(d, '.env.local'), '# mine\nSTRIPE_KEY=x\nVITE_SUPABASE_URL=old\n');
+  connectMod.writeEnv(d, { VITE_SUPABASE_URL: 'new', VITE_SUPABASE_ANON_KEY: 'k' });
+  assert.strictEqual(fs.readFileSync(path.join(d, '.env.local'), 'utf8'), '# mine\nSTRIPE_KEY=x\nVITE_SUPABASE_URL=new\nVITE_SUPABASE_ANON_KEY=k\n');
+  assert.deepStrictEqual(connectMod.readEnv(d), { STRIPE_KEY: 'x', VITE_SUPABASE_URL: 'new', VITE_SUPABASE_ANON_KEY: 'k' });
+});
+test('a repo with only init/connect files still counts as empty', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'fleet-snap-'));
+  for (const f of ['README.md', 'CHANGELOG.md', '.gitignore', '.env.local']) fs.writeFileSync(path.join(d, f), '');
+  for (const f of ['supabase', '.vercel', '.fleet']) fs.mkdirSync(path.join(d, f));
+  assert.strictEqual(require('../lib/planner').repoSnapshot(d).empty, true);
+  fs.writeFileSync(path.join(d, 'package.json'), '{}');
+  assert.strictEqual(require('../lib/planner').repoSnapshot(d).empty, false);
+});
+
 (async () => {
   let failed = 0;
   for (const [name, fn] of tests) {

@@ -44,6 +44,8 @@ process.stdin.on('end', () => {
       [/\b(mkfs|dd\s+if=|shutdown|reboot|killall|pkill\s+-9\s+node)\b/, 'no system commands'],
       [/\bcurl\b.*\|\s*(ba)?sh\b/, 'no piping downloads into a shell'],
       [/\b(npm|pnpm|yarn)\s+publish\b|\bcargo\s+publish\b|\btwine\s+upload\b|\bgh\s+(release|pr\s+merge)\b|\bvercel\s+(--prod|deploy)\b/, 'no publishing or deploying'],
+      [/\bsupabase\s+(db\s+(push|reset)|link|projects|secrets|functions\s+deploy|login)\b/, 'the runner and the human own the live Supabase project'],
+      [/(^|[;&|(])\s*(npx\s+|bunx\s+|pnpm\s+dlx\s+)?vercel(\s|$)/, 'the runner and the human own Vercel'],
       [/\.fleet\/(state|config\.json|settings\.json)/, '.fleet state belongs to the runner'],
       [/>\s*(?<!\w)\.env\b|(?<!\w)\.env\.(local|production)\b.*(cat|echo|printf)|\bcat\s+[^|<]*(?<![\w.])\.env\b/, 'secrets stay out of agent context'],
     ];

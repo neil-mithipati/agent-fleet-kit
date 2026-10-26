@@ -14,6 +14,32 @@ const f='$APP/.fleet/config.json'; const c=JSON.parse(require('fs').readFileSync
 c.claude_bin='$KIT/test/fake-claude.js'; c.dashboard.auto_start=false; c.worktree_root='$TMP/wt';
 require('fs').writeFileSync(f, JSON.stringify(c,null,2));"
 git init -q --bare -b main "$TMP/remote.git"; git -C "$APP" remote add origin "$TMP/remote.git"
+export FAKE_CLI_LOG="$TMP/cli.log"; : > "$FAKE_CLI_LOG"
+if [ "$SCEN" = "dbpush" ]; then
+  node -e "
+const f='$APP/.fleet/config.json'; const c=JSON.parse(require('fs').readFileSync(f));
+c.connect.supabase_bin='$KIT/test/fake-supabase.js'; c.connect.vercel_bin='$KIT/test/fake-vercel.js';
+require('fs').writeFileSync(f, JSON.stringify(c,null,2));"
+  git -C "$APP" add -A; git -C "$APP" -c user.name=t -c user.email=t@x commit -qm "use fake clis"
+  echo "== fleet connect"; (cd "$APP" && "$FLEET" connect)
+  echo "== assert: connect"
+  (cd "$APP" && node -e "
+const fs=require('fs'),cp=require('child_process');
+const fail=m=>{console.error('connect: '+m);process.exit(1);};
+const env=fs.readFileSync('.env.local','utf8'); const log=fs.readFileSync(process.env.FAKE_CLI_LOG,'utf8');
+if(!/VITE_SUPABASE_URL=https:\/\/abcdefghijklmnopqrst\.supabase\.co/.test(env))fail('url');
+if(!/VITE_SUPABASE_ANON_KEY=sb_publishable_fake/.test(env))fail('publishable key');
+if(/SERVICE-ROLE/.test(env))fail('service role key leaked into .env.local');
+if(!/SUPABASE_DB_PASSWORD=\S{20,}/.test(env))fail('db password');
+if((fs.statSync('.env.local').mode&0o077)!==0)fail('.env.local readable by others');
+if(cp.execSync('git ls-files').toString().match(/\.env|\.vercel|supabase\/\.temp/))fail('secret or link file tracked by git');
+if(!cp.execSync('git ls-files supabase').toString().includes('supabase/config.toml'))fail('supabase/ not committed');
+if(JSON.parse(fs.readFileSync('.fleet/config.json')).supabase.project_ref!=='abcdefghijklmnopqrst')fail('ref not saved');
+if(!/vercel git connect --yes/.test(log))fail('git connect');
+if((log.match(/vercel env add/g)||[]).length!==6)fail('expected 6 env adds');
+if(/db push/.test(log))fail('no migrations yet, should not db push');
+console.log('connect ok');")
+fi
 if [ -n "${DIVERGE:-}" ]; then git -C "$APP" push -q -u origin main; git clone -q "$TMP/remote.git" "$TMP/other"; echo teammate > "$TMP/other/TEAM.md"; git -C "$TMP/other" add -A; git -C "$TMP/other" -c user.name=t -c user.email=t@x commit -qm "teammate commit"; git -C "$TMP/other" push -q; fi
 cd "$APP"
 if [ -n "${REQ:-}" ]; then echo "{\"name\":\"x\",\"version\":\"0.0.1\"}" > package.json; git add -A; git -c user.name=t -c user.email=t@x commit -qm "seed"; fi
@@ -30,6 +56,12 @@ if [ "$SCEN" = "blocked" ]; then
   "$FLEET" retry "$ID" "make it print the word resolved"
   "$FLEET" do
   "$FLEET" status --all
+fi
+if [ "$SCEN" = "dbpush" ]; then
+  echo "== assert: merged migration was pushed exactly once, with the password"
+  grep "db push" "$FAKE_CLI_LOG"
+  [ "$(grep -c 'supabase db push --linked --yes \[pw\]' "$FAKE_CLI_LOG")" = "1" ] || { echo "expected exactly one db push"; exit 1; }
+  if [ -n "${FAKE_DB_PUSH_FAIL:-}" ]; then grep -q "supabase db push failed" CHANGELOG.md || { echo "failed db push missing from CHANGELOG"; exit 1; }; fi
 fi
 if [ "$SCEN" = "reviewstuck" ]; then
   echo "== assert: out of review rounds stops without another build"

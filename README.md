@@ -13,9 +13,10 @@ while you're away from the keyboard.
 
 ## How it works
 
-solid: main path · dashed: escalation or a question for you · red gates or
-blocking review findings go back to the **same** builder (≤3 attempts); a
-stronger tier only on the last one; lint/typecheck fixes go to haiku.
+Solid: main path. Dashed: escalation, or a question for you.
+**Retries:** red gates or blocking review findings send the task back to the
+same builder (≤3 attempts). A stronger tier joins only on the last attempt;
+lint and typecheck fixes go to haiku.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 420, "nodeSpacing": 40, "rankSpacing": 55, "curve": "linear"}}}%%
@@ -106,7 +107,4 @@ Watch it live at http://127.0.0.1:4777. Read what shipped in `CHANGELOG.md`.
 | `fleet retry <id> "answer"` | Unblock a task, then `fleet do` |
 | `fleet stop` | Pause; in-flight work resumes later |
 
-New apps default to **TypeScript, React + Vite, Supabase (+ Auth), Tailwind,
-Vitest and ESLint, deployed on Vercel**, unless your request names another
-stack. Change the default, models, limits, parallelism and auto-push in
-`.fleet/config.json`.
+Tune models, limits, parallelism and auto-push in `.fleet/config.json`.

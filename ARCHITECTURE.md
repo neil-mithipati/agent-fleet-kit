@@ -184,6 +184,24 @@ release tags. If the remote moved, the runner fast-forwards or merges the
 remote commits in first; on conflict it aborts and reports. It never forces
 and never rebases.
 
+## Supabase and Vercel
+
+`fleet connect` (lib/connect.js) runs in the runner with the human's own
+`supabase` and `vercel` CLI logins: it creates and links the Supabase project,
+writes the URL, publishable key and database password to `.env.local`
+(gitignored, mode 600, denied to agents), links the Vercel project to the
+GitHub repo and sets the public env vars there. Vercel then deploys every push.
+
+With `db_push: "auto"` (default), a merge that adds files under
+`supabase/migrations/` is followed by `supabase db push --linked`, inside the
+merge lock so migrations apply in merge order. Migration tasks are always
+reviewed (`supabase/**` is a sensitive path). A failed push never reverts the
+merge; it is listed under "Needs your attention" in the changelog.
+
+Agents can run local Supabase commands (`supabase migration new`, `gen types`)
+but the guard and deny list block `db push`, `db reset`, `link`, `projects`,
+`secrets` and any `vercel` command.
+
 ## Dashboard
 
 `lib/dashboard.js` is a dependency-free HTTP server: one static page and
