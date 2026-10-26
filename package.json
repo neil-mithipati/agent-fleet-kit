@@ -4,7 +4,7 @@
   "description": "A fleet of Claude agents that builds an app with minimal human oversight: plan, build in parallel worktrees, gate, review, merge, changelog.",
   "bin": { "fleet": "bin/fleet" },
   "engines": { "node": ">=18" },
-  "scripts": { "test": "node test/unit.js && for s in gatefail reviewfail reviewstuck escalate blocked default questions; do test/e2e.sh $s > /dev/null || { echo \"e2e $s failed\"; exit 1; }; echo \"e2e $s ok\"; done" },
+  "scripts": { "test": "node test/unit.js && for s in gatefail lintfix reviewfail reviewstuck escalate blocked default questions; do test/e2e.sh $s > /dev/null || { echo \"e2e $s failed\"; exit 1; }; echo \"e2e $s ok\"; done" },
   "license": "MIT",
   "private": true
 }

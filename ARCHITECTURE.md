@@ -66,7 +66,7 @@ Every loop is in `lib/scheduler.js`, and every loop has a counter:
 |---|---|---|
 | build attempts per task | `retries.max_attempts` (3) | `needs_human` |
 | review rounds per task | `retries.max_review_rounds` (2) | `needs_human` |
-| gate failures before escalating a tier | 2 | escalate |
+| tier escalation (`escalation: last_resort`) | only before the final attempt, only for `failed`, `no_changes` or a failing test gate | escalate one tier |
 | agent turns | per-role `limits.max_turns` | the call fails, counts as an attempt |
 | agent wall clock | per-role `limits.timeout_min` | killed, counts as an attempt, charged its `budget_usd` cap |
 | agent dollars | per-role `limits.budget_usd` | the call fails, counts as an attempt |
@@ -109,9 +109,16 @@ Size is chosen by the planner and enforced by code:
 | medium | builder (sonnet) | reviewer (sonnet) | a feature following an existing pattern |
 | large | builder-deep (opus) | reviewer-deep (opus), two passes | scaffold, data model, auth, cross-cutting |
 
-Failures escalate one tier at a time and the retry continues from the same
-worktree, with the previous attempt's notes and the gate output or findings in
-its prompt. A reviewer that discovers a medium task actually touches auth or
+Retries continue from the same worktree, with the previous attempt's notes and
+the gate output or findings in its prompt. The default policy
+(`escalation: "last_resort"`) retries on the same tier: most failures are
+fixed by the context in the prompt, not by a bigger model. A tier escalation
+happens only before the final attempt, and only for capability failures
+(`failed`, no changes, a failing test gate). Timeouts and turn limits never
+escalate, since stronger models are slower; the retry picks up the committed
+work in progress. A lint or typecheck failure is mechanical, so its fix goes
+to `fix_tier` (haiku) for one attempt, then back to the task's own tier.
+`escalation: "eager"` restores escalate-on-most-failures. A reviewer that discovers a medium task actually touches auth or
 data escalates to the deep reviewer rather than improvising an adversarial
 pass.
 
@@ -184,9 +191,10 @@ two seconds. It is started detached by `fleet do` when
 
 `test/fake-claude.js` imitates `claude -p` (same flags, same stream-json) and
 plays scripted roles; `test/e2e.sh <scenario>` runs the whole pipeline against
-it: `gatefail`, `reviewfail`, `reviewstuck` (asserts no build after the last
+it: `gatefail`, `lintfix` (lint fix runs on the fix tier, no escalation),
+`reviewfail`, `reviewstuck` (asserts no build after the last
 review round), `escalate`, `blocked` (then `fleet retry` and resume), `default`
 (fast planner), `questions`. `test/unit.js` covers what the scenarios can't
-observe: gates not blocking the event loop, timeout process-tree kills, and
+observe: the escalation policy table, gates not blocking the event loop, timeout process-tree kills, and
 cost accounting for calls that never report a cost. `npm test` runs all of it. Point `claude_bin` in
 `.fleet/config.json` at the fake to reproduce.

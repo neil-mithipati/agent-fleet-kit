@@ -59,8 +59,9 @@ automatically).
    `max_parallel` builders run at once; tasks that share files are serialized
    automatically. Small → haiku, medium → sonnet, large → opus.
 3. **Gates.** The runner, not the agent, runs your typecheck, lint and test
-   commands in the worktree. Red gates send the task back with the output.
-   Twice red escalates to a stronger builder.
+   commands in the worktree. Red gates send the task back with the output,
+   on the same model. Lint and typecheck fixes go to haiku. A stronger model
+   is only brought in for the final attempt.
 4. **Review.** Small tasks ship on green gates alone, if their diff really was
    small (≤5 files, ≤200 lines, no sensitive paths); otherwise they are
    promoted and reviewed. Medium tasks get a correctness review. Large tasks
@@ -126,6 +127,8 @@ The ones that matter most:
   "limits": { "builder": { "max_turns": 60, "timeout_min": 25, "budget_usd": 4 }, ... },
   "small": { "max_files": 5, "max_lines": 200, "sensitive": ["**/migrations/**", ...] },
   "retries": { "max_attempts": 3, "max_review_rounds": 2 },
+  "escalation": "last_resort",             // or "eager": escalate on most failures
+  "fix_tier": "builder-light",             // who fixes lint/typecheck failures; null = task's own tier
   "mission": { "budget_usd": 30, "timeout_min": 240 },
   "gates": { "lint": null },               // override or disable a detected gate
   "release": { "auto": "large" },          // "large" | "always" | "never"
@@ -170,7 +173,8 @@ Pushing is done by the runner, not by any agent, and only ever as a plain
 ## Testing the kit itself
 
 ```bash
-test/e2e.sh gatefail      # also: reviewfail, escalate, blocked, default, questions
+npm test                  # unit checks + every e2e scenario
+test/e2e.sh gatefail      # one scenario; also: lintfix, reviewfail, reviewstuck, escalate, blocked, default, questions
 ```
 
 These run the whole pipeline against a scripted stand-in for `claude -p`,

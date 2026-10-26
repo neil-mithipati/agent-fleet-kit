@@ -61,7 +61,12 @@ if (role.startsWith('builder')) {
   const reviewPrev = /Review findings to fix/.test(prompt);
   const humanNote = /Note from the human/.test(prompt);
   if (/scaffold/.test(title)) {
-    write('package.json', JSON.stringify({ name: 'fake-app', version: '0.1.0', scripts: { test: 'node --test' } }, null, 2));
+    const scripts = { test: 'node --test' };
+    if (scenario === 'lintfix') {
+      scripts.lint = 'test ! -f LINT_BAD';
+      if (gateFailPrev) { try { fs.rmSync(path.join(cwd, 'LINT_BAD')); } catch {} } else write('LINT_BAD', 'lint error\n');
+    }
+    write('package.json', JSON.stringify({ name: 'fake-app', version: '0.1.0', scripts }, null, 2));
     write('src/add.js', "'use strict';\nmodule.exports = { add: (a, b) => a + b };\n");
     // scenario gatefail: first attempt writes a failing test, fixed on retry
     const broken = scenario === 'gatefail' && !gateFailPrev;

@@ -67,6 +67,30 @@ test('a reported cost is used as-is', async () => {
   assert.strictEqual(r.cost_estimated, false);
 });
 
+const { shouldEscalate } = require('../lib/scheduler');
+test('escalation policy: last_resort vs eager', () => {
+  const cfg = (escalation) => ({ escalation, retries: { max_attempts: 3, max_review_rounds: 2 } });
+  const t = (attempts, extra = {}) => ({ attempts, review_rounds: 0, gate_failures: 0, ...extra });
+  const L = cfg('last_resort'), E = cfg('eager');
+  // last_resort: same tier until the final attempt, and only for capability failures
+  for (const k of ['failed', 'no_changes', 'gates_test']) {
+    assert.strictEqual(shouldEscalate(L, t(1), k), false, `${k} after attempt 1`);
+    assert.strictEqual(shouldEscalate(L, t(2), k), true, `${k} before final attempt`);
+  }
+  for (const k of ['timeout', 'max_turns', 'budget', 'crashed', 'error', 'bad_output', 'gates_mechanical', 'review'])
+    assert.strictEqual(shouldEscalate(L, t(2, { gate_failures: 5, review_rounds: 5 }), k), false, `${k} never escalates`);
+  assert.strictEqual(shouldEscalate(L, t(1), 'light_blocked'), true);
+  // default is last_resort
+  assert.strictEqual(shouldEscalate({ retries: { max_attempts: 3 } }, t(1), 'failed'), false);
+  // eager keeps the original behaviour
+  assert.strictEqual(shouldEscalate(E, t(1), 'failed'), true);
+  assert.strictEqual(shouldEscalate(E, t(1), 'timeout'), true);
+  assert.strictEqual(shouldEscalate(E, t(1), 'crashed'), false);
+  assert.strictEqual(shouldEscalate(E, t(2), 'crashed'), true);
+  assert.strictEqual(shouldEscalate(E, t(1, { gate_failures: 1 }), 'gates_test'), false);
+  assert.strictEqual(shouldEscalate(E, t(1, { gate_failures: 2 }), 'gates_test'), true);
+});
+
 (async () => {
   let failed = 0;
   for (const [name, fn] of tests) {

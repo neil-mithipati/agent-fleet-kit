@@ -42,4 +42,17 @@ console.log(t.id,t.state,'builds:',builds.join(' '));
 if(t.state!=='needs_human'){console.error('expected needs_human');process.exit(1);}
 if(builds.length!==2){console.error('expected exactly 2 builds, got '+builds.length);process.exit(1);}"
 fi
+if [ "$SCEN" = "lintfix" ]; then
+  echo "== assert: lint failure is fixed by the fix tier, then merged, no escalation"
+  node -e "
+const fs=require('fs'),path=require('path');const d='.fleet/state';
+const t=fs.readdirSync(d+'/tasks').map(f=>JSON.parse(fs.readFileSync(d+'/tasks/'+f))).find(t=>/scaffold/.test(t.title));
+const runs=[];(function walk(p){for(const f of fs.readdirSync(p)){const q=path.join(p,f);fs.statSync(q).isDirectory()?walk(q):runs.push(f);}})(d+'/runs');
+const builds=runs.filter(f=>f.startsWith(t.id+'-')&&/-builder[^/]*\\.log$/.test(f)).sort();
+console.log(t.id,t.state,'escalations:',t.escalations||0,'builds:',builds.join(' '));
+const want=[t.id+'-1-builder-deep.log',t.id+'-2-builder-light.log'];
+if(t.state!=='merged'){console.error('expected merged');process.exit(1);}
+if(JSON.stringify(builds)!==JSON.stringify(want)){console.error('expected '+want.join(' '));process.exit(1);}
+if(t.escalations){console.error('expected no escalation');process.exit(1);}"
+fi
 echo "== OK ($APP)"
