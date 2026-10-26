@@ -1,0 +1,10 @@
+{
+  "name": "agent-fleet",
+  "version": "1.0.0",
+  "description": "A fleet of Claude agents that builds an app with minimal human oversight: plan, build in parallel worktrees, gate, review, merge, changelog.",
+  "bin": { "fleet": "bin/fleet" },
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "test/e2e.sh gatefail && test/e2e.sh blocked" },
+  "license": "MIT",
+  "private": true
+}

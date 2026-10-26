@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet Mission Control</title>
+<style>
+  :root {
+    --bg: #04060b; --panel: #090d16; --line: #1a2535; --line2: #243247;
+    --fg: #c4d3e3; --dim: #6c7f95; --faint: #3b4a5e;
+    --ok: #35d07f; --warn: #f5b400; --bad: #ff4a4a; --act: #43b6ff; --violet: #9d7bff;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 12px/1.45 var(--mono); }
+  body { padding: 10px 12px 24px; }
+  header { display: flex; align-items: baseline; gap: 18px; border-bottom: 1px solid var(--line2); padding: 6px 2px 10px; flex-wrap: wrap; }
+  header h1 { font-size: 13px; letter-spacing: .28em; margin: 0; font-weight: 600; color: #e6eef8; }
+  header .meta { color: var(--dim); display: flex; gap: 18px; flex-wrap: wrap; }
+  header .meta b { color: var(--fg); font-weight: 500; }
+  .lamp { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 1px #000 inset; }
+  .lamp.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .lamp.act { background: var(--act); box-shadow: 0 0 8px var(--act); animation: blink 1.2s infinite; }
+  .lamp.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .lamp.bad { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+  @keyframes blink { 50% { opacity: .35; } }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; margin-top: 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px 10px; min-height: 60px; }
+  .panel h2 { font-size: 10px; letter-spacing: .22em; color: var(--dim); margin: 0 0 8px; font-weight: 600; text-transform: uppercase; display: flex; justify-content: space-between; }
+  .panel h2 span { color: var(--faint); letter-spacing: 0; }
+  .c12 { grid-column: span 12; } .c8 { grid-column: span 8; } .c6 { grid-column: span 6; } .c4 { grid-column: span 4; } .c3 { grid-column: span 3; }
+  @media (max-width: 1100px) { .c8, .c6, .c4, .c3 { grid-column: span 12; } }
+  /* agents */
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .agent { border: 1px solid var(--line); border-radius: 3px; padding: 7px 9px; background: #070a12; min-height: 86px; }
+  .agent.active { border-color: #1f4d6e; background: #071220; }
+  .agent .role { font-weight: 600; color: #e6eef8; letter-spacing: .06em; }
+  .agent .model { color: var(--faint); float: right; }
+  .agent .st { margin-top: 6px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent .st b { color: var(--act); font-weight: 500; }
+  .agent .tot { margin-top: 4px; color: var(--faint); }
+  /* board */
+  .board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .col h3 { font-size: 10px; letter-spacing: .16em; color: var(--dim); margin: 0 0 6px; font-weight: 600; text-transform: uppercase; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .col h3 i { font-style: normal; color: var(--faint); float: right; }
+  .card { border: 1px solid var(--line); border-left-width: 3px; border-radius: 2px; padding: 5px 7px; margin-bottom: 5px; background: #070a12; cursor: pointer; }
+  .card:hover { border-color: var(--line2); border-left-color: inherit; }
+  .card .id { color: #e6eef8; font-weight: 600; }
+  .card .sz { float: right; color: var(--faint); text-transform: uppercase; font-size: 10px; letter-spacing: .1em; }
+  .card .t { color: var(--fg); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .card .m { color: var(--faint); margin-top: 3px; font-size: 11px; }
+  .card.s-queued { border-left-color: var(--faint); } .card.s-building, .card.s-gating, .card.s-reviewing, .card.s-merging { border-left-color: var(--act); }
+  .card.s-merged { border-left-color: var(--ok); } .card.s-needs_human { border-left-color: var(--bad); } .card.s-cancelled { border-left-color: var(--faint); opacity: .6; }
+  /* telemetry */
+  .bar { height: 8px; background: #0d1420; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; margin: 3px 0 8px; }
+  .bar i { display: block; height: 100%; background: var(--act); }
+  .bar i.warn { background: var(--warn); } .bar i.bad { background: var(--bad); } .bar i.ok { background: var(--ok); }
+  .kv { display: flex; justify-content: space-between; color: var(--dim); } .kv b { color: var(--fg); font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; } td { padding: 2px 4px 2px 0; color: var(--dim); vertical-align: top; } td.v { color: var(--fg); text-align: right; }
+  /* log */
+  .log { height: 300px; overflow: auto; font-size: 11px; }
+  .log div { white-space: nowrap; color: var(--dim); } .log .ts { color: var(--faint); margin-right: 8px; }
+  .log .k-agent { color: var(--act); } .log .k-task { color: var(--fg); } .log .k-release { color: var(--violet); } .log .k-mission { color: var(--warn); }
+  .log .bad { color: var(--bad); } .log .ok { color: var(--ok); }
+  .human { color: var(--bad); }
+  .human div { margin-bottom: 6px; color: var(--fg); } .human code { color: var(--warn); }
+  .empty { color: var(--faint); }
+  /* modal */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: flex-start; justify-content: center; padding: 30px 10px; overflow: auto; z-index: 10; }
+  .modal.on { display: flex; }
+  .modal .box { background: var(--panel); border: 1px solid var(--line2); border-radius: 3px; width: min(1000px, 100%); padding: 14px 16px 18px; }
+  .modal h2 { font-size: 12px; letter-spacing: .12em; margin: 0 0 10px; color: #e6eef8; }
+  .modal h4 { font-size: 10px; letter-spacing: .2em; color: var(--dim); margin: 14px 0 4px; text-transform: uppercase; }
+  .modal pre { background: #04060b; border: 1px solid var(--line); padding: 8px; white-space: pre-wrap; word-break: break-word; color: var(--fg); margin: 0; max-height: 320px; overflow: auto; font-size: 11px; }
+  .modal .x { float: right; cursor: pointer; color: var(--dim); }
+  .modal a { color: var(--act); }
+  ul { margin: 0; padding-left: 16px; } li { color: var(--fg); }
+  .tag { display: inline-block; border: 1px solid var(--line2); border-radius: 2px; padding: 0 5px; color: var(--dim); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span id="runnerLamp" class="lamp"></span>FLEET MISSION CONTROL</h1>
+  <div class="meta">
+    <div>REPO <b id="repo">—</b></div>
+    <div>MISSION <b id="mid">—</b> <span id="mstatus"></span></div>
+    <div>MET <b id="met">00:00:00</b></div>
+    <div>SPENT <b id="spent">$0.00</b></div>
+    <div>AGENTS ACTIVE <b id="nactive">0</b></div>
+    <div>UPDATED <b id="updated">—</b></div>
+  </div>
+</header>
+
+<div class="grid">
+  <div class="panel c12">
+    <h2>Current request <span id="planner"></span></h2>
+    <div id="request" class="empty">no mission yet — run <code>fleet do "..."</code></div>
+    <div id="assumptions" style="margin-top:6px;color:var(--dim)"></div>
+  </div>
+
+  <div class="panel c12">
+    <h2>Agent roster <span id="rosterNote"></span></h2>
+    <div class="roster" id="roster"></div>
+  </div>
+
+  <div class="panel c12">
+    <h2>Task board <span id="boardNote"></span></h2>
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="panel c4">
+    <h2>Telemetry</h2>
+    <div id="telemetry"></div>
+  </div>
+  <div class="panel c4">
+    <h2>Needs a human</h2>
+    <div id="human" class="human"><span class="empty">nothing</span></div>
+  </div>
+  <div class="panel c4">
+    <h2>Releases</h2>
+    <div id="releases"><span class="empty">none yet</span></div>
+  </div>
+
+  <div class="panel c12">
+    <h2>Event log <span id="logNote"></span></h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtMoney = (n) => '$' + (n || 0).toFixed(2);
+const COLS = [['queued','Queued'],['building','Building'],['gating','Gates'],['reviewing','Review'],['merging','Merging'],['merged','Merged'],['needs_human','Needs human']];
+const ROLE_ORDER = ['planner','planner-deep','builder-light','builder','builder-deep','reviewer','reviewer-deep','publisher'];
+let S = null, missionStart = null;
+
+function hms(ms) { if (!ms || ms < 0) return '00:00:00'; const s = Math.floor(ms/1000); return [s/3600, s%3600/60, s%60].map(n => String(Math.floor(n)).padStart(2,'0')).join(':'); }
+function ago(iso) { const s = Math.max(0, (Date.now() - new Date(iso).getTime())/1000); return s < 60 ? Math.floor(s)+'s' : s < 3600 ? Math.floor(s/60)+'m' : (s/3600).toFixed(1)+'h'; }
+
+async function tick() {
+  try {
+    const r = await fetch('/api/state'); S = await r.json();
+    render();
+    $('updated').textContent = new Date().toTimeString().slice(0,8);
+  } catch (e) { $('runnerLamp').className = 'lamp bad'; $('updated').textContent = 'offline'; }
+}
+
+function render() {
+  const m = S.mission;
+  $('repo').textContent = S.name;
+  $('runnerLamp').className = 'lamp ' + (S.runner_alive ? 'act' : (m && m.status === 'partial') ? 'warn' : m ? 'ok' : '');
+  $('mid').textContent = m ? m.id : '—';
+  $('mstatus').textContent = m ? m.status.toUpperCase() : '';
+  $('mstatus').style.color = !m ? '' : m.status === 'running' ? 'var(--act)' : m.status === 'done' ? 'var(--ok)' : m.status === 'partial' || m.status === 'needs_human' ? 'var(--warn)' : 'var(--dim)';
+  missionStart = m ? new Date(m.started).getTime() : null;
+  const end = m && m.ended ? new Date(m.ended).getTime() : Date.now();
+  $('met').textContent = missionStart ? hms(end - missionStart) : '00:00:00';
+  $('spent').textContent = fmtMoney(S.usage.total_cost_usd);
+  const active = Object.values(S.agents.active || {});
+  $('nactive').textContent = active.length;
+
+  // request
+  if (m) {
+    $('request').className = '';
+    $('request').innerHTML = `<div style="color:#e6eef8">${esc(m.request)}</div>${m.summary ? `<div style="color:var(--dim);margin-top:4px">${esc(m.summary)}</div>` : ''}${m.stack ? `<div style="color:var(--faint);margin-top:2px">stack: ${esc(m.stack)}</div>` : ''}`;
+    $('planner').textContent = m.planner ? `planned by ${m.planner}` : '';
+    $('assumptions').innerHTML = (m.assumptions && m.assumptions.length) ? 'assumed: ' + m.assumptions.map(a => `<span class="tag" style="text-transform:none;letter-spacing:0">${esc(a)}</span>`).join(' ') : '';
+    if (m.questions && m.questions.length) $('assumptions').innerHTML = '<span style="color:var(--warn)">planner questions:</span> ' + m.questions.map(esc).join(' · ');
+  }
+
+  // roster
+  const totals = S.usage.by_role || {};
+  const recentByRole = {}; for (const r of S.agents.recent || []) if (!recentByRole[r.role]) recentByRole[r.role] = r;
+  $('roster').innerHTML = ROLE_ORDER.map(role => {
+    const cfg = (S.roles || []).find(r => r.role === role) || {};
+    const act = active.find(a => a.role === role);
+    const rec = recentByRole[role];
+    const tot = totals[role];
+    let st;
+    if (act) st = `<span class="lamp act"></span><b>${esc(act.task || 'working')}</b> ${esc(act.label || '')}<br><span style="color:var(--fg)">${esc(act.last_tool || 'starting…')}</span><br>${act.turns} turns · ${ago(act.started)}`;
+    else if (rec) st = `<span class="lamp ${rec.status === 'ok' ? 'ok' : 'warn'}"></span>idle · last ${esc(rec.task || '')} ${rec.status === 'ok' ? 'ok' : esc(rec.status)} ${ago(rec.ended)} ago`;
+    else st = `<span class="lamp"></span>idle`;
+    return `<div class="agent ${act ? 'active' : ''}"><span class="model">${esc(cfg.model || '')}</span><div class="role">${esc(role)}</div><div class="st">${st}</div><div class="tot">${tot ? `${tot.calls} calls · ${fmtMoney(tot.cost_usd)}` : 'no calls yet'}</div></div>`;
+  }).join('');
+  $('rosterNote').textContent = `max ${S.config.max_parallel} parallel`;
+
+  // board
+  const tasks = S.tasks || [];
+  const shown = tasks.filter(t => !t.released || t.state !== 'merged' || (m && t.mission === m.id));
+  $('board').innerHTML = COLS.map(([k, label]) => {
+    const list = shown.filter(t => t.state === k || (k === 'queued' && t.state === 'cancelled'));
+    return `<div class="col"><h3>${label} <i>${list.length}</i></h3>${list.map(card).join('') || ''}</div>`;
+  }).join('');
+  $('boardNote').textContent = `${tasks.filter(t => t.state === 'merged').length} merged total`;
+
+  // telemetry
+  const budget = S.config.budget_usd, spentM = m ? (m.cost_usd || liveMissionCost()) : 0;
+  const pct = (a, b) => Math.min(100, Math.round(100 * a / (b || 1)));
+  const rl = S.usage.rate_limit;
+  const win = rl && rl.unifiedWindows;
+  $('telemetry').innerHTML = `
+    <div class="kv"><span>mission spend</span><b>${fmtMoney(spentM)} / ${fmtMoney(budget)}</b></div><div class="bar"><i class="${pct(spentM,budget) > 90 ? 'bad' : pct(spentM,budget) > 70 ? 'warn' : ''}" style="width:${pct(spentM,budget)}%"></i></div>
+    <div class="kv"><span>mission time</span><b>${m ? Math.round((end - missionStart)/60000) : 0} / ${S.config.timeout_min} min</b></div><div class="bar"><i style="width:${m ? pct((end - missionStart)/60000, S.config.timeout_min) : 0}%"></i></div>
+    ${win ? `<div class="kv"><span>plan usage · 5h window</span><b>${Math.round((win.five_hour?.utilization||0)*100)}%</b></div><div class="bar"><i class="ok" style="width:${Math.round((win.five_hour?.utilization||0)*100)}%"></i></div>
+    <div class="kv"><span>plan usage · 7d window</span><b>${Math.round((win.seven_day?.utilization||0)*100)}%</b></div><div class="bar"><i class="ok" style="width:${Math.round((win.seven_day?.utilization||0)*100)}%"></i></div>` : ''}
+    <table>${Object.entries(totals).sort((a,b)=>b[1].cost_usd-a[1].cost_usd).map(([r,v]) => `<tr><td>${esc(r)}</td><td class="v">${v.calls} calls</td><td class="v">${fmtMoney(v.cost_usd)}</td></tr>`).join('')}</table>
+    <div class="kv" style="margin-top:6px"><span>all-time spend</span><b>${fmtMoney(S.usage.total_cost_usd)} · ${S.usage.calls} calls</b></div>`;
+
+  // human
+  const stuck = tasks.filter(t => t.state === 'needs_human');
+  $('human').innerHTML = stuck.length ? stuck.map(t => `<div><b>${esc(t.id)}</b> ${esc(t.title)}<br><span style="color:var(--dim)">${esc(t.reason)}</span><br><code>fleet retry ${esc(t.id)} "…"</code></div>`).join('') : '<span class="empty">nothing</span>';
+
+  // releases
+  $('releases').innerHTML = (S.releases || []).length ? S.releases.slice(0, 8).map(r => `<div style="margin-bottom:6px"><b style="color:var(--violet)">${esc(r.version)}</b> <span style="color:var(--faint)">${esc(r.date)}</span><br>${esc(r.headline)} <span style="color:var(--faint)">· ${r.tasks.length} tasks</span></div>`).join('') + `<div style="color:var(--faint)">in CHANGELOG.md</div>` : `<span class="empty">none yet · ${tasks.filter(t => t.state==='merged' && !t.released).length} merged tasks unreleased</span>`;
+
+  // log
+  const logEl = $('log');
+  const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 30;
+  logEl.innerHTML = (S.events || []).map(e => {
+    const ts = new Date(e.at).toTimeString().slice(0,8);
+    let txt = '';
+    if (e.kind === 'agent') txt = `<span class="k-agent">[${esc(e.agent)}]</span> ${esc(e.task||'')} ${e.state === 'start' ? 'start' : `end ${e.status === 'ok' ? '<span class="ok">ok</span>' : `<span class="bad">${esc(e.status)}</span>`}${e.cost != null ? ' ' + fmtMoney(e.cost) : ''}${e.ms ? ' ' + Math.round(e.ms/1000) + 's' : ''}`}`;
+    else if (e.kind === 'task') txt = `<span class="k-task">${esc(e.task)}</span> → <span class="${e.state === 'merged' ? 'ok' : e.state === 'needs_human' ? 'bad' : ''}">${esc(e.state)}</span> ${esc(e.note||'')}`;
+    else if (e.kind === 'release') txt = `<span class="k-release">release ${esc(e.version)}</span> ${esc(e.note||'')}`;
+    else if (e.kind === 'push') txt = `<span class="${e.failed ? 'bad' : 'ok'}">push</span> ${esc(e.branch)} → ${esc(e.remote)} ${esc(e.note||'')}`;
+    else if (e.kind === 'mission') txt = `<span class="k-mission">mission ${esc(e.mission)}</span> ${esc(e.state)} ${esc(e.note||'')}`;
+    else txt = esc(JSON.stringify(e));
+    return `<div><span class="ts">${ts}</span>${txt}</div>`;
+  }).join('');
+  if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+  $('logNote').textContent = `${(S.events||[]).length} recent`;
+}
+
+function liveMissionCost() {
+  if (!S.mission) return 0;
+  return (S.tasks || []).filter(t => t.mission === S.mission.id).reduce((a, t) => a + (t.cost_usd || 0), 0);
+}
+
+function card(t) {
+  const meta = [t.tier, t.attempts ? `att ${t.attempts}` : null, t.cost_usd ? fmtMoney(t.cost_usd) : null, t.promoted ? 'promoted' : null, t.review_verdict ? t.review_verdict.split(' ')[0] : null].filter(Boolean).join(' · ');
+  return `<div class="card s-${t.state}" onclick="openTask('${t.id}')"><span class="sz">${t.size}</span><span class="id">${esc(t.id)}</span><div class="t">${esc(t.title)}</div><div class="m">${esc(meta)}${t.state === 'merged' && t.merged_sha ? ' · ' + esc(t.merged_sha) : ''}</div></div>`;
+}
+
+async function openTask(id) {
+  const t = (S.tasks || []).find(x => x.id === id); if (!t) return;
+  const runs = (S.agents.recent || []).filter(r => r.task === id);
+  $('modalBox').innerHTML = `
+    <span class="x" onclick="closeModal()">[ close ]</span>
+    <h2>${esc(t.id)} · ${esc(t.title)}</h2>
+    <div><span class="tag">${t.size}</span><span class="tag">${esc(t.state)}</span>${t.tier ? `<span class="tag">${esc(t.tier)}</span>` : ''}<span class="tag">attempts ${t.attempts}</span><span class="tag">${fmtMoney(t.cost_usd)}</span>${t.branch ? `<span class="tag" style="text-transform:none">${esc(t.branch)}</span>` : ''}</div>
+    ${t.reason ? `<h4>Needs a human</h4><pre style="color:var(--bad)">${esc(t.reason)}</pre>` : ''}
+    <h4>Description</h4><pre>${esc(t.description)}</pre>
+    <h4>Acceptance</h4><ul>${(t.acceptance||[]).map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+    <h4>Files</h4><pre>${esc((t.files||[]).join('\n') || '—')}</pre>
+    ${t.summary ? `<h4>Builder summary</h4><pre>${esc(t.summary)}${t.notes ? '\n\nnotes: ' + esc(t.notes) : ''}</pre>` : ''}
+    ${t.gates ? `<h4>Gates</h4><pre>${esc(t.gates)}</pre>` : ''}
+    ${(t.findings||[]).length ? `<h4>Review findings kept</h4><ul>${t.findings.map(f => `<li>[${esc(f.severity)}] ${esc(f.title)}: ${esc(f.detail)}</li>`).join('')}</ul>` : ''}
+    ${(t.attempts_log||[]).length ? `<h4>Attempts</h4>${t.attempts_log.map(a => `<pre><b>#${a.n} ${esc(a.tier)} → ${esc(a.outcome)}</b>\n${esc(a.detail)}</pre>`).join('')}` : ''}
+    <h4>History</h4><pre>${(t.history||[]).map(h => `${h.at.slice(11,19)}  ${h.state.padEnd(12)} ${h.note||''}`).map(esc).join('\n')}</pre>
+    ${runs.length ? `<h4>Agent logs</h4>${runs.map(r => `<div><a href="/api/log?file=${encodeURIComponent(r.log)}" target="_blank">${esc(r.role)} attempt ${r.attempt} · ${esc(r.status)} · ${fmtMoney(r.cost_usd)}</a></div>`).join('')}` : ''}
+  `;
+  $('modal').classList.add('on');
+}
+function closeModal() { $('modal').classList.remove('on'); }
+$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+tick(); setInterval(tick, 2000);
+setInterval(() => { if (missionStart && S && S.mission && !S.mission.ended) $('met').textContent = hms(Date.now() - missionStart); }, 1000);
+</script>
+</body>
+</html>
